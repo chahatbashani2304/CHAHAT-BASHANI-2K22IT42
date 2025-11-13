@@ -186,9 +186,26 @@ Expected:
 - sendable_balance = 100 + min(previous_balance, 50)
 - monthly_sent = 0
 
-============================================================
-⓬ LEADERBOARD
-============================================================
+{
+  "message": "monthly reset applied where needed",
+  "status": "ok"
+}
+
+{
+  "student": {
+    "created_at": "2025-11-13T02:42:20.410115",
+    "id": 1,
+    "last_reset": "2025-11-13",
+    "monthly_sent": 20,
+    "name": "Alice",
+    "redeemable_balance": 0,
+    "sendable_balance": 80,
+    "total_received": 0
+  }
+}
+
+#LEADERBOARD
+
 Description:
 Display top recipients ranked by total credits received.
 
@@ -197,6 +214,27 @@ Invoke-WebRequest -Uri "http://127.0.0.1:5000/leaderboard?limit=5" -Method GET |
 
 Expected:
 Leaderboard JSON with Bob on top (total_received = 20, endorsements_received_total = 1)
+
+{
+  "leaderboard": [
+    {
+      "endorsements_received_total": 0,
+      "name": "Bob",
+      "recognitions_received_count": 1,
+      "student_id": 2,
+      "total_received": 20
+    },
+    {
+      "endorsements_received_total": 0,
+      "name": "Alice",
+      "recognitions_received_count": 0,
+      "name": "Alice",
+      "recognitions_received_count": 0,
+      "student_id": 1,
+      "total_received": 0
+    }
+  ]
+}
 
 
 #BONUS: CHECK ALL STUDENTS
