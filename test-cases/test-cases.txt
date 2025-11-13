@@ -1,0 +1,188 @@
+# Test Cases for Recognition System (PowerShell Commands)
+
+# Server base URL: http://127.0.0.1:5000
+# Run app first: cd src && python app.py
+# Then run each command below in PowerShell (Windows)
+# Tip: Add "| Select-Object -ExpandProperty Content" to see raw JSON output.
+
+
+#HEALTH CHECK
+
+Description:
+Verify that the Flask app is running successfully.
+
+Command:
+Invoke-WebRequest -Uri http://127.0.0.1:5000/health -Method GET | Select-Object -ExpandProperty Content
+
+Expected:
+{"status":"ok"}
+
+
+#CREATE STUDENTS
+Description:
+Create three students: Alice, Bob, and Charlie.
+
+Commands:
+# Alice
+Invoke-WebRequest -Uri http://127.0.0.1:5000/students -Method POST -Headers @{ "Content-Type" = "application/json" } -Body '{"name":"Alice"}' | Select-Object -ExpandProperty Content
+
+# Bob
+Invoke-WebRequest -Uri http://127.0.0.1:5000/students -Method POST -Headers @{ "Content-Type" = "application/json" } -Body '{"name":"Bob"}' | Select-Object -ExpandProperty Content
+
+# Charlie
+Invoke-WebRequest -Uri http://127.0.0.1:5000/students -Method POST -Headers @{ "Content-Type" = "application/json" } -Body '{"name":"Charlie"}' | Select-Object -ExpandProperty Content
+
+Expected:
+Each response contains a "student" JSON object with initial balances set to 100 credits.
+
+
+# SELF-RECOGNITION (INVALID)
+
+Description:
+Ensure a student cannot recognize themselves.
+
+Command:
+Invoke-WebRequest -Uri http://127.0.0.1:5000/recognitions -Method POST -Headers @{ "Content-Type" = "application/json" } -Body '{"sender_id":1,"receiver_id":1,"amount":10,"message":"Self-test"}' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Content
+
+Expected:
+{"error":"self-recognition not allowed"}
+
+
+#VALID RECOGNITION TRANSFER
+Description:
+Alice (id=1) sends 20 credits to Bob (id=2).
+
+Command:
+Invoke-WebRequest -Uri http://127.0.0.1:5000/recognitions -Method POST -Headers @{ "Content-Type" = "application/json" } -Body '{"sender_id":1,"receiver_id":2,"amount":20,"message":"Great teamwork!"}' | Select-Object -ExpandProperty Content
+
+Expected:
+Recognition JSON with "amount":20. Balances update correctly.
+
+
+
+#CHECK BALANCES
+
+Description:
+View balances after a recognition.
+
+Commands:
+# Alice (Sender)
+Invoke-WebRequest -Uri http://127.0.0.1:5000/students/1 -Method GET | Select-Object -ExpandProperty Content
+
+# Bob (Receiver)
+Invoke-WebRequest -Uri http://127.0.0.1:5000/students/2 -Method GET | Select-Object -ExpandProperty Content
+
+Expected:
+- Alice sendable_balance = 80
+- Bob redeemable_balance = 20
+
+
+#INSUFFICIENT BALANCE
+
+Description:
+Ensure sender cannot send more credits than available.
+
+Command:
+Invoke-WebRequest -Uri http://127.0.0.1:5000/recognitions -Method POST -Headers @{ "Content-Type" = "application/json" } -Body '{"sender_id":1,"receiver_id":2,"amount":999}' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Content
+
+Expected:
+{"error":"insufficient sendable balance"}
+
+
+#MONTHLY SENDING LIMIT (100 CREDITS)
+Description:
+Ensure student cannot exceed 100 credits sent per month.
+
+Commands:
+# Alice sends 80 more credits (reaching 100 total)
+Invoke-WebRequest -Uri http://127.0.0.1:5000/recognitions -Method POST -Headers @{ "Content-Type" = "application/json" } -Body '{"sender_id":1,"receiver_id":2,"amount":80,"message":"Finishing monthly limit"}' | Select-Object -ExpandProperty Content
+
+# Attempt to exceed limit
+Invoke-WebRequest -Uri http://127.0.0.1:5000/recognitions -Method POST -Headers @{ "Content-Type" = "application/json" } -Body '{"sender_id":1,"receiver_id":2,"amount":1}' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Content
+
+Expected:
+{"error":"monthly sending limit exceeded"}
+
+
+#ENDORSEMENT
+
+Description:
+Charlie (id=3) endorses recognition id=1.
+
+Command:
+Invoke-WebRequest -Uri http://127.0.0.1:5000/recognitions/1/endorse -Method POST -Headers @{ "Content-Type" = "application/json" } -Body '{"endorser_id":3}' | Select-Object -ExpandProperty Content
+
+Duplicate endorsement test:
+Invoke-WebRequest -Uri http://127.0.0.1:5000/recognitions/1/endorse -Method POST -Headers @{ "Content-Type" = "application/json" } -Body '{"endorser_id":3}' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Content
+
+Expected:
+{"error":"endorser has already endorsed this recognition"}
+
+
+#REDEMPTION (VALID)
+
+Description:
+Bob redeems 10 credits.
+
+Command:
+Invoke-WebRequest -Uri http://127.0.0.1:5000/students/2/redeem -Method POST -Headers @{ "Content-Type" = "application/json" } -Body '{"credits":10}' | Select-Object -ExpandProperty Content
+
+Expected:
+{
+  "redemption": {
+    "student_id": 2,
+    "credits": 10,
+    "voucher_value": 50
+  }
+}
+
+
+#REDEEM MORE THAN BALANCE (INVALID)
+
+Description:
+Attempt to redeem more than available credits.
+
+Command:
+Invoke-WebRequest -Uri http://127.0.0.1:5000/students/2/redeem -Method POST -Headers @{ "Content-Type" = "application/json" } -Body '{"credits":999}' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Content
+
+Expected:
+{"error":"insufficient redeemable credits"}
+
+
+#MONTHLY RESET & CARRY-FORWARD
+
+Description:
+Trigger monthly reset for all students.
+
+Commands:
+Invoke-WebRequest -Uri http://127.0.0.1:5000/admin/reset_all -Method POST | Select-Object -ExpandProperty Content
+
+# Verify balances reset
+Invoke-WebRequest -Uri http://127.0.0.1:5000/students/1 -Method GET | Select-Object -ExpandProperty Content
+
+Expected:
+- sendable_balance = 100 + min(previous_balance, 50)
+- monthly_sent = 0
+
+============================================================
+⓬ LEADERBOARD
+============================================================
+Description:
+Display top recipients ranked by total credits received.
+
+Command:
+Invoke-WebRequest -Uri "http://127.0.0.1:5000/leaderboard?limit=5" -Method GET | Select-Object -ExpandProperty Content
+
+Expected:
+Leaderboard JSON with Bob on top (total_received = 20, endorsements_received_total = 1)
+
+
+#BONUS: CHECK ALL STUDENTS
+
+Commands:
+Invoke-WebRequest -Uri http://127.0.0.1:5000/students/1 -Method GET | Select-Object -ExpandProperty Content
+Invoke-WebRequest -Uri http://127.0.0.1:5000/students/2 -Method GET | Select-Object -ExpandProperty Content
+Invoke-WebRequest -Uri http://127.0.0.1:5000/students/3 -Method GET | Select-Object -ExpandProperty Content
+
+
+
