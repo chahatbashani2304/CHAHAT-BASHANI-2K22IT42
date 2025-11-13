@@ -19,6 +19,8 @@ Assistant: (Created a complete README demo outline with setup, run instructions,
 User: This error is coming on testing with curl ... Invoke-WebRequest : Cannot bind parameter 'Headers'...
 Assistant: (Explained PowerShell alias issue for curl, provided fixes using curl.exe, Invoke-RestMethod, or Git Bash.)
 
+User:app.db is not required in repository how to use .gitignore for the same
+Assistant:(Explained to push your source code, testcases, and readme, not runtime files.)
 
 User: Create a txt file of this conversation of the whole conversation from start to end.
 Assistant: (This file — containing the entire summarized conversation transcript.)
