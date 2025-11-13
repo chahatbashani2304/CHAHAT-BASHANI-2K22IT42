@@ -17,7 +17,7 @@ db = SQLAlchemy(app)
 @app.route("/")
 def home():
     return """
-        <h2>🎓 Recognition System API is running ✅</h2>
+        <h2> Recognition System API is running </h2>
         <p>Available endpoints:</p>
         <ul>
             <li><a href="/health">/health</a> – check server status</li>
